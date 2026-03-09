@@ -1,9 +1,9 @@
 
 # ── 1. VPC ────────────────────────────────────
-resources "aws_vpc" "main" {
-    cidr_block         = var.vpc_cidrs
-    enable_dns_name    = true
-    enable_domain_name = true
+resource "aws_vpc" "main" {
+    cidr_block         = var.vpc_cidr
+    enable_dns_support      = true    # Required for private hosted zones & ECS
+    enable_dns_hostnames = true    # Assigns DNS names to EC2 instances
 
     tags = {
         Name = "${var.name_prefix}-vpc"
@@ -29,7 +29,7 @@ resource "aws_eip" "nat" {
 
 resource "aws_nat_gateway" "nat" {
     allocation_id = aws_eip.nat.id
-    subnet_id     = aws_subnet.private.id
+    subnet_id     = aws_subnet.public[0].id
 
     tags = {
         Name = "${var.name_prefix}-nat"
@@ -58,7 +58,7 @@ resource "aws_subnet" "private" {
     count              = length(var.private_subnet_cidrs)
     vpc_id             = aws_vpc.main.id
     cidr_block         = var.private_subnet_cidrs[count.index]
-    availability_zone  = var.availability_zones[count.index  ]
+    availability_zone  = var.availability_zones[count.index]
 
     tags = {
         Name = "${var.name_prefix}-private-${count.index + 1}"
@@ -83,8 +83,11 @@ resource "aws_route_table" "public" {
 # Private Route TABLE
 resource "aws_route_table" "private" {
     vpc_id     = aws_vpc.main.id
-    gateway_id = aws_nat_gateway.nat.id
 
+    route {
+        cidr_block = "0.0.0.0/0"
+        nat_gateway_id = aws_nat_gateway.nat.id
+    }
     tags = {
         Name = "${var.name_prefix}-private-rt"
     }
@@ -93,12 +96,14 @@ resource "aws_route_table" "private" {
 
 # ── 4. Subnet Assocaition ────────────────────────────
 resource "aws_route_table_association" "public_assoc" {
-    subnet_id      = aws_subnet.public.id
-    route_table_id = aws_route_table.public
+    count          = length(var.public_subnet_cidrs)
+    subnet_id      = aws_subnet.public[count.index].id
+    route_table_id = aws_route_table.public.id
 }
 
 
 resource "aws_route_table_association" "private_assoc" {
-    subnet_id      = aws_subnet.private.id
+    count          = length(var.public_subnet_cidrs)
+    subnet_id      = aws_subnet.private[count.index].id
     route_table_id = aws_route_table.private.id
 }

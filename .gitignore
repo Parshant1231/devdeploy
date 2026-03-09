@@ -1,0 +1,10 @@
+# Terraform local directories and state files
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/crash.log
+terraform/crash.*.log
+
+# App JavaScript entry file
+app.js
